@@ -61,6 +61,8 @@ class StagedExecutionEngine(val storageManager: StorageManager, val defaultJITOp
 
   def insertIDB(rId: Int, ruleSeq: Seq[Atom]): Unit = {
     val rule = ruleSeq.toArray
+    if (rule.head.negated) throw new Exception("Head of rule cannot be negated")
+
     precedenceGraph.idbs.addOne(rId)
     val allRules = ast.rules.getOrElseUpdate(rId, AllRulesNode(mutable.ArrayBuffer.empty, rId)).asInstanceOf[AllRulesNode]
     // TODO: sort here in case EDBs/etc are already defined?
@@ -77,11 +79,13 @@ class StagedExecutionEngine(val storageManager: StorageManager, val defaultJITOp
             case x: Variable => VarTerm(x)
             case x: Constant => ConstTerm(x)
           }),
-        rule.drop(1).map(b =>
-          LogicAtom(b.rId, b.terms.map {
+        rule.drop(1).map(b => {
+          val atom = LogicAtom(b.rId, b.terms.map {
             case x: Variable => VarTerm(x)
             case x: Constant => ConstTerm(x)
-          })),
+          })
+          if (b.negated) { NegAtom(atom) } else atom
+        }),
         rule,
         hash
       ))
