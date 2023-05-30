@@ -61,9 +61,8 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
   }
 
   private inline def prefilter(consts: Map[Int, Constant], skip: Int, row: CollectionsRow): Boolean = {
-    consts.isEmpty || consts.forall((idx, const) => // for each filter // TODO: make sure out of range fails
-      row(idx - skip) == const
-    )
+    // for each filter // TODO: make sure out of range fails
+    consts.forall((idx, const) => row(idx - skip) == const)
   }
 
   private inline def toJoin(k: JoinIndexes, innerTuple: CollectionsRow, outerTuple: CollectionsRow): Boolean = {
@@ -80,20 +79,46 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
   }
 
   override def joinProjectHelper_withHash(inputsEDB: Seq[EDB], rId: Int, hash: String, sortOrder: (Int, Int, Int)): CollectionsEDB = {
+    // inputs is the collection of EDBs that are the inputs to the rule. Each
+    // EDB is a Relation[StorageTerm], so we get the inputs to the join
+    // operation.
     val inputs = asCollectionsSeqEDB(inputsEDB)
     val originalK = allRulesAllIndexes(rId)(hash)
     if (inputs.length == 1) // just filter
+      // TODO : Negation : if the rule is negated, we need to make sure that
+      //                   we do not return any tuples that are in the input
+      //                   relation. That is, we invert the result of the
+      //                   filter.
+      // TODO : Negation : we need to consider the domain of the input, and
+      //                   reverse it.
+
+      // We are performing a join with a single input relation, so we just
+      // filter the input relation.
       inputs.head
         .filter(e =>
+          // TODO : This is wrong. We need to consider the domain of the rule
+          //                       and emit the tuples based on that.
+
+          // First, we retrieve the indices of the constants in the rule, and
+          // make sure that they are within the bounds of the input relation.
           val filteredC = originalK.constIndexes.filter((ind, _) => ind < e.length)
-          prefilter(filteredC, 0, e) && filteredC.size == originalK.constIndexes.size)
+          // Then, we look at whether the rule is negated or not. If it is
+          // negated, we want to return the tuples that are not filtered out
+          // by the rule.
+          val negated = originalK.atoms.head.negated
+          // Ensure we preserve the inputs where the constants match the
+          // constants in the rule.
+          val removed = prefilter(filteredC, 0, e) && filteredC.size == originalK.constIndexes.size
+          if (negated) !removed else removed
+        )
         .map(t =>
           CollectionsRow(originalK.projIndexes.flatMap((typ, idx) =>
             typ match {
               case "v" => t.lift(idx.asInstanceOf[Int])
               case "c" => Some(idx)
               case _ => throw new Exception("Internal error: projecting something that is not a constant nor a variable")
-            })))
+            }))
+        )
     else
 //      val (sorted, newHash) = JoinIndexes.getSorted(inputs.toArray, edb => edb.length, rId, hash, this, sortAhead) // NOTE: already sorted in staged compiler/ProjectJoinFilterOp.run
       val result = inputs

@@ -5,9 +5,31 @@ import datalog.execution.ExecutionEngine
 import scala.collection.mutable
 import scala.quoted.{Expr, Quotes}
 
-trait AbstractProgram // TODO: alternate program?
+trait AbstractProgram[C] // TODO: alternate program?
 
-type Constant = Int | String // TODO: other constant types?
+/**
+ * A domain is the set of values that a variable can take on. For negative
+ * programs, the domain may be used to compute facts that are not in the
+ * program.
+ */
+trait Domain[T] {
+
+  /**
+   * The values in the domain.
+   */
+  def values: Iterable[T]
+}
+
+given iterableDomain[T](using iterable: Iterable[T]): Domain[T] with
+  def values: Iterable[T] = iterable
+
+given Domain[Int] with {
+  def values: Iterable[Int] = throw new Exception("int domain too large")
+}
+
+given Domain[String] with {
+  def values: Iterable[String] = throw new Exception("string domain too large")
+}
 
 val __ = Variable(-1, true)
 
@@ -28,7 +50,7 @@ class Atom(val rId: Int, val terms: Seq[Term], val negated: Boolean = false) {
   def unary_!(): Atom = Atom(rId, terms, !negated)
   def :- (body: Atom*): Unit = ???
   def :- (body: Unit): Unit = ???
-  val hash: String = s"$rId${terms.mkString("", "", "")}"
+  val hash: String = s"$rId${terms.mkString("", "", "")}$negated"
 }
 
 case class Relation[T <: Constant](id: Int, name: String)(using ee: ExecutionEngine) {

@@ -15,7 +15,8 @@ import scala.util.{Failure, Success}
 
 enum OpCode:
   case PROGRAM, SWAP_CLEAR, SEQ, SCAN, SCANEDB, SPJ, INSERT, UNION, DIFF, DEBUG, DEBUGP, DOWHILE,
-  EVAL_RULE_NAIVE, EVAL_RULE_SN, EVAL_RULE_BODY, EVAL_NAIVE, EVAL_SN, LOOP_BODY, OTHER // convenience labels for generating functions
+  EVAL_RULE_NAIVE, EVAL_RULE_SN, EVAL_RULE_BODY, EVAL_NAIVE, EVAL_SN, 
+  LOOP_BODY, STRATA, OTHER // convenience labels for generating functions
 object OpCode {
   def relational(opCode: OpCode): Boolean =
     Seq(SCAN, OpCode.SCANEDB, OpCode.SPJ, OpCode.UNION, OpCode.DIFF, OpCode.EVAL_RULE_BODY, OpCode.EVAL_RULE_NAIVE, OpCode.EVAL_RULE_SN).contains(opCode)
