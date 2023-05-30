@@ -111,19 +111,21 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
       case ProgramNode(ruleMap) =>
         val scc = ctx.precedenceGraph.scc()
         val stratum = scc.map(rels => ruleMap.view.filterKeys(rels.contains))
-        SequenceOp(OpCode.EVAL_STRATA,
-           stratum.map(rules =>
-             SequenceOp(OpCode.EVAL_STRATUM,
-               DoWhileOp(
-                 DB.Derived,
-                 SequenceOp(OpCode.LOOP_BODY,
-                   SwapAndClearOp(),
-                   naiveEval(rules)
+        ProgramOp(
+          SequenceOp(OpCode.EVAL_STRATA,
+             stratum.map(rules =>
+               SequenceOp(OpCode.EVAL_STRATUM,
+                 DoWhileOp(
+                   DB.Derived,
+                   SequenceOp(OpCode.LOOP_BODY,
+                     SwapAndClearOp(),
+                     naiveEval(rules)
+                   ),
                  ),
-               ),
-               UpdateDiscoveredOp(),
-             )
-          ): _*
+                 UpdateDiscoveredOp(),
+               )
+            ): _*
+          ),
         )
       case _ => throw new Exception("Non-root passed to IR Program")
     }
