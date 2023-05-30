@@ -109,7 +109,7 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
   def generateNaive(ast: ASTNode): IROp[Any] = {
     ast match {
       case ProgramNode(ruleMap) =>
-        val scc = ctx.precedenceGraph.scc()
+        val scc = ctx.precedenceGraph.scc(ctx.toSolve)
         val stratum = scc.map(rels => ruleMap.view.filterKeys(rels.contains))
         ProgramOp(
           SequenceOp(OpCode.EVAL_STRATA,
@@ -134,7 +134,7 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
   def generateSemiNaive(ast: ASTNode): IROp[Any] = {
     ast match {
       case ProgramNode(ruleMap) =>
-        val scc = ctx.precedenceGraph.scc()
+        val scc = ctx.precedenceGraph.scc(ctx.toSolve)
         val stratum = scc.map(rels => ruleMap.view.filterKeys(rels.contains))
         ProgramOp(
           SequenceOp(OpCode.EVAL_STRATA,

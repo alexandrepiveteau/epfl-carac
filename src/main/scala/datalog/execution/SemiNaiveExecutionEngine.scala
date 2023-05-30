@@ -57,7 +57,7 @@ class SemiNaiveExecutionEngine(override val storageManager: StorageManager) exte
     // TODO: if a IDB predicate without vars, then solve all and test contains result?
     //    if (relations.isEmpty)
     //      return Set()
-    val strata = precedenceGraph.scc()
+    val strata = precedenceGraph.scc(rId)
     storageManager.initEvaluation() // facts previously derived
 
     debug(s"solving relation: ${storageManager.ns(rId)} order of relations=", strata.toString)
