@@ -1,7 +1,7 @@
 package datalog
 
-import datalog.execution.{ExecutionEngine, JITOptions, SemiNaiveExecutionEngine, StagedExecutionEngine, StagedSnippetExecutionEngine, ir, NaiveExecutionEngine}
-import datalog.dsl.{Constant, Program, __}
+import datalog.execution.{ExecutionEngine, JITOptions, NaiveExecutionEngine, SemiNaiveExecutionEngine, StagedExecutionEngine, StagedSnippetExecutionEngine, ir}
+import datalog.dsl.{Constant, Program, __, not}
 import datalog.execution.ast.transform.CopyEliminationPass
 import datalog.execution.ir.InterpreterContext
 import datalog.storage.{DefaultStorageManager, NS, VolcanoStorageManager}
@@ -90,6 +90,26 @@ def tc(program: Program): Unit = {
   edge("c", "d", "blue") :- ()
 
   println("RES=" + path.solve())
+}
+
+def neg(program: Program): Unit = {
+  val a = program.relation[Constant]("a")
+  val b = program.relation[Constant]("b")
+  val c = program.relation[Constant]("c")
+  val x, y = program.variable()
+
+  a("a") :- ()
+  a("b") :- ()
+  a("c") :- ()
+  a("d") :- ()
+
+  b("a") :- ()
+  b("b") :- ()
+
+  // Should contain all values in a that are not in b, aka "c" and "d".
+  c(x, y) :- (not(b(x)), not(b(y)), a(x), a(y))
+
+  println("RES=" + c.solve())
 }
 
 def acyclic(program: Program) = {
@@ -655,9 +675,9 @@ def isAfter(program: Program) =
 //  val dotty = staging.Compiler.make(getClass.getClassLoader)
 //  var sort = 1
 //  println(s"OLD SN: $sort")
-  given engine1: ExecutionEngine = new NaiveExecutionEngine(new DefaultStorageManager())
+  given engine1: ExecutionEngine = new SemiNaiveExecutionEngine(new VolcanoStorageManager())
   val program1 = Program(engine1)
-  tc(program1)
+  neg(program1)
   println("\n\n_______________________\n\n")
 
 //    val jo2 = JITOptions(ir.OpCode.OTHER, dotty, aot = false, block = true)

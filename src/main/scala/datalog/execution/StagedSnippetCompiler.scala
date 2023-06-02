@@ -46,7 +46,17 @@ class StagedSnippetCompiler(val storageManager: StorageManager)(using val jitOpt
 
   given ToExpr[JoinIndexes] with {
     def apply(x: JoinIndexes)(using Quotes) = {
-      '{ JoinIndexes(${ Expr(x.varIndexes) }, ${ Expr(x.constIndexes) }, ${ Expr(x.projIndexes) }, ${ Expr(x.deps) }, ${Expr (x.atoms) }, ${ Expr(x.edb) }) }
+      '{
+        JoinIndexes(
+          ${ Expr(x.varIndexes) },
+          ${ Expr(x.constIndexes) },
+          ${ Expr(x.projIndexes) },
+          ${ Expr(x.deps) },
+          ${ Expr(x.negated) },
+          ${ Expr(x.sizes) },
+          ${ Expr(x.atoms) },
+          ${ Expr(x.edb) },
+        ) }
     }
   }
 

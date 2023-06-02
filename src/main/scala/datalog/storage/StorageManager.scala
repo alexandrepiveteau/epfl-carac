@@ -23,6 +23,20 @@ trait StorageManager(val ns: NS) {
   def getEDB(rId: RelationId): EDB
   def getAllEDBS(): mutable.Map[RelationId, Any] // if you ever just want to read the EDBs as a map, used for testing
 
+  /**
+   * Returns all the possible facts that could appear in the EDB for a given
+   * relation.
+   *
+   * - The resulting EDB will contain all possible facts using constants
+   * from the original EDB and IDB.
+   * - The arity of the resulting EDB will respected.
+   *
+   * @param arity the arity of the resulting EDB.
+   * @return the resulting EDB.
+   */
+  def getAllPossibleEDBs(arity: Int): EDB
+  def getDiscoveredEDBs(rId: RelationId): EDB
+  
   def getKnownDerivedDB(rId: RelationId): EDB
   def getNewDerivedDB(rId: RelationId): EDB
   def getKnownDeltaDB(rId: RelationId): EDB

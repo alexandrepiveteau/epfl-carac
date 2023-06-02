@@ -64,10 +64,12 @@ class StagedExecutionEngine(val storageManager: StorageManager, val defaultJITOp
             case x: Constant => ConstTerm(x)
           }),
         rule.drop(1).map(b =>
-          LogicAtom(b.rId, b.terms.map {
+          val atom = LogicAtom(b.rId, b.terms.map {
             case x: Variable => VarTerm(x)
             case x: Constant => ConstTerm(x)
-          })),
+          })
+          if (b.negated) NegAtom(atom) else atom
+        ),
         rule,
         hash
       ))

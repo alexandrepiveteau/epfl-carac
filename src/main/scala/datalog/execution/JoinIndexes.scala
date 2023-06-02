@@ -18,12 +18,15 @@ type AllIndexes = mutable.Map[String, JoinIndexes]
  * @param constIndexes - indexes of constants within the body
  * @param projIndexes - for each term in the head, either ("c", the constant value) or ("v", the first index of the variable within the body)
  * @param deps - set of relations directly depended upon by this rule
+ * @param negated - for each atom in the body, whether it is negated
  * @param edb - for rules that have EDBs defined on the same predicate, just read
  */
 case class JoinIndexes(varIndexes: Seq[Seq[Int]],
                        constIndexes: Map[Int, Constant],
                        projIndexes: Seq[(String, Constant)],
                        deps: Seq[Int],
+                       negated: Array[Boolean],
+                       sizes: Array[Int],
                        atoms: Array[Atom],
                        edb: Boolean = false
                       ) {
@@ -51,6 +54,8 @@ object JoinIndexes {
     val body = rule.drop(1)
 
     val deps = body.map(a => a.rId) // TODO: should this be a set?
+    val sizes = body.map(a => a.terms.size)
+    val negated = body.map(a => a.negated)
 
     val bodyVars = body
       .flatMap(a => a.terms)
@@ -70,6 +75,8 @@ object JoinIndexes {
         matches.map(_._2).toIndexedSeq
       )
       .toIndexedSeq
+    
+    // TODO (ALEX): Check that all the variables are limited here.
 
     // variable ids in the head atom
     val projects = rule(0).terms.map {
@@ -79,7 +86,7 @@ object JoinIndexes {
         ("v", variables(v))
       case c: Constant => ("c", c)
     }
-    new JoinIndexes(bodyVars, constants.toMap, projects, deps, rule)
+    new JoinIndexes(bodyVars, constants.toMap, projects, deps, negated, sizes, rule)
   }
 
   def getSortAhead[T: ClassTag](input: Array[T], sortBy: T => Int, rId: Int, oldHash: String, sm: StorageManager)(using jitOptions: JITOptions): (Array[T], String) = {
