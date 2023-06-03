@@ -105,7 +105,6 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
                   if (r == d && !found && i > idx)
                     found = true
                     idx = i
-                    if (k.negated(i)) println(s"negating ${r} delta")
                     withNegation(k.negated(i))(k.sizes(i),
                       UnionOp(OpCode.UNION,
                         ScanOp(r, DB.Delta, KNOWLEDGE.Known),
@@ -113,7 +112,6 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
                       )
                     )
                   else
-                    if (k.negated(i)) println(s"negating ${r} derived")
                     withNegation(k.negated(i))(k.sizes(i),
                       UnionOp(OpCode.UNION,
                         ScanOp(r, DB.Derived, KNOWLEDGE.Known),
