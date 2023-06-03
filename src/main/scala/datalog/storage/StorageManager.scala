@@ -35,6 +35,15 @@ trait StorageManager(val ns: NS) {
    * @return the resulting EDB.
    */
   def getAllPossibleEDBs(arity: Int): EDB
+
+  /**
+   * Returns the discovered EDBs from a previous stratum for a particular
+   * relation. The returned EDBs will always be monotonically increasing for any
+   * given relation.
+   *
+   * @param rId the relation to get the discovered EDBs for.
+   * @return the resulting EDBs.
+   */
   def getDiscoveredEDBs(rId: RelationId): EDB
   
   def getKnownDerivedDB(rId: RelationId): EDB

@@ -243,13 +243,11 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
                 if (r == d && !found && i > idx) {
                   found = true
                   idx = i
-                  if (k.negated(i)) println(s"negating ${ns(r)} delta")
                   withNegation(k.negated(i))(k.sizes(i),
                     union(Seq(getKnownDeltaDB(r), getDiscoveredEDBs(r)))
                   )
                 }
                 else {
-                  if (k.negated(i)) println(s"negating ${ns(r)} derived")
                   withNegation(k.negated(i))(k.sizes(i),
                     union(Seq(getKnownDerivedDB(r), getDiscoveredEDBs(r)))
                   ) // TODO: warn if EDB is empty? Right now can't tell the difference between undeclared and empty EDB
