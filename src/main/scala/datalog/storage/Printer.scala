@@ -115,7 +115,10 @@ class Printer[S <: StorageManager](val sm: S) {
       case SwapAndClearOp() => "SWAP & CLEAR"
       case DoWhileOp(toCmp, children:_*) => s"DO {\n${printIR(children.head, ident+1)}}\n${i}WHILE {$toCmp}\n"
       case SequenceOp(fnCode, children:_*) => s"SEQ{${seq+1}${if (fnCode != OpCode.SEQ) "::" + fnCode else "_"}:${children.zipWithIndex.map((o, idx) => s"${seq+1}.$idx" + printIR(o, ident+1, seq+1)).mkString("[\n", ",\n", "]")}"
+      case UpdateDiscoveredOp() => "UPDATE_DISCOVERED()"
       case ScanEDBOp(srcRel) => s"SCANEDB(edbs[${ctx.storageManager.ns(srcRel)}])"
+      case ScanDiscoveredOp(srcRel) => s"SCANDISCOVERED(${ctx.storageManager.ns(srcRel)})"
+      case NegateOp(arity, children: _*) => s"NEGATE($arity)${children.map(s => printIR(s, ident+1)).mkString("(\n", ",\n", ")")}"
       case ScanOp(srcRel, db, knowledge) =>
         s"SCAN[$db.$knowledge](${ctx.storageManager.ns(srcRel)})"
       case ProjectJoinFilterOp(rId, hash, children:_*) =>
