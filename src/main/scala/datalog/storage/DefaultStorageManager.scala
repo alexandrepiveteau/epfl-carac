@@ -218,9 +218,9 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
    * @return the [[CollectionsEDB]] after applying negation.
    */
   private def withNegation(negated: Boolean)
-                          (arity: Int, edb: CollectionsEDB): CollectionsEDB =
+                          (arity: Int, edb: EDB): EDB =
     if !negated then edb
-    else getAllPossibleEDBs(arity).diff(edb)
+    else diff(getAllPossibleEDBs(arity), edb)
 
   /**
    * Use iterative collection operators to evaluate an IDB rule using Semi-Naive algo
@@ -245,13 +245,13 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
                   idx = i
                   if (k.negated(i)) println(s"negating ${ns(r)} delta")
                   withNegation(k.negated(i))(k.sizes(i),
-                    getKnownDeltaDB(r) ++ getDiscoveredEDBs(r)
+                    union(Seq(getKnownDeltaDB(r), getDiscoveredEDBs(r)))
                   )
                 }
                 else {
                   if (k.negated(i)) println(s"negating ${ns(r)} derived")
                   withNegation(k.negated(i))(k.sizes(i),
-                    getKnownDerivedDB(r) ++ getDiscoveredEDBs(r)
+                    union(Seq(getKnownDerivedDB(r), getDiscoveredEDBs(r)))
                   ) // TODO: warn if EDB is empty? Right now can't tell the difference between undeclared and empty EDB
                 }
               ), k, (0, 0, 0)).wrapped // don't sort when not staging
@@ -270,7 +270,7 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
             joinHelper(
               k.deps.zipWithIndex.map((r, i) =>
                 withNegation(k.negated(i))(k.sizes(i),
-                  getKnownDerivedDB(r) ++ getDiscoveredEDBs(r)
+                  union(Seq(getKnownDerivedDB(r), getDiscoveredEDBs(r)))
                 )
               ), k // TODO: warn if EDB is empty? Right now can't tell the difference between undeclared and empty EDB)
             ), k

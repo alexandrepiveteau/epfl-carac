@@ -62,13 +62,14 @@ class StagedExecutionEngine(val storageManager: StorageManager, val defaultJITOp
           rule.head.terms.map {
             case x: Variable => VarTerm(x)
             case x: Constant => ConstTerm(x)
-          }),
+          },
+          rule.head.negated
+        ),
         rule.drop(1).map(b =>
-          val atom = LogicAtom(b.rId, b.terms.map {
+          LogicAtom(b.rId, b.terms.map {
             case x: Variable => VarTerm(x)
             case x: Constant => ConstTerm(x)
-          })
-          if (b.negated) NegAtom(atom) else atom
+          }, b.negated)
         ),
         rule,
         hash
@@ -296,6 +297,12 @@ class StagedExecutionEngine(val storageManager: StorageManager, val defaultJITOp
 
       case op: ScanEDBOp =>
         op.run(storageManager)
+
+      case op: ScanDiscoveredOp =>
+        op.run(storageManager)
+
+      case op: NegateOp =>
+        op.run_continuation(storageManager, op.children.map(o => (sm: StorageManager) => jit(o)))
 
       case op: ProjectJoinFilterOp =>
         op.run_continuation(storageManager, op.children.map(o => (sm: StorageManager) => jit(o)))

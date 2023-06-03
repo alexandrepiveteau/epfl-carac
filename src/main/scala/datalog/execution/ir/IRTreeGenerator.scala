@@ -45,6 +45,11 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
         ):_*,
     )
 
+  private def withNegation(negated: Boolean)
+                          (arity: Int, edb: IROp[EDB]): IROp[EDB] =
+    if !negated then edb
+    else NegateOp(arity, edb)
+
   def naiveEvalRule(ast: ASTNode): IROp[EDB] = {
     ast match {
       case AllRulesNode(rules, rId, edb) =>
@@ -60,7 +65,14 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
           ScanEDBOp(r)
         else
           ProjectJoinFilterOp(atoms.head.rId, hash,
-            k.deps.map(r => ScanOp(r, DB.Derived, KNOWLEDGE.Known)):_*
+            k.deps.zipWithIndex.map((r, i) =>
+              withNegation(k.negated(i))(k.sizes(i),
+                UnionOp(OpCode.UNION,
+                  ScanOp(r, DB.Derived, KNOWLEDGE.Known),
+                  ScanDiscoveredOp(r),
+                )
+              )
+            ):_*
           )
       case _ =>
         debug("AST node passed to naiveEval:", () => ctx.storageManager.printer.printAST(ast))
@@ -93,9 +105,21 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
                   if (r == d && !found && i > idx)
                     found = true
                     idx = i
-                    ScanOp(r, DB.Delta, KNOWLEDGE.Known)
+                    if (k.negated(i)) println(s"negating ${r} delta")
+                    withNegation(k.negated(i))(k.sizes(i),
+                      UnionOp(OpCode.UNION,
+                        ScanOp(r, DB.Delta, KNOWLEDGE.Known),
+                        ScanDiscoveredOp(r),
+                      )
+                    )
                   else
-                    ScanOp(r, DB.Derived, KNOWLEDGE.Known)
+                    if (k.negated(i)) println(s"negating ${r} derived")
+                    withNegation(k.negated(i))(k.sizes(i),
+                      UnionOp(OpCode.UNION,
+                        ScanOp(r, DB.Derived, KNOWLEDGE.Known),
+                        ScanDiscoveredOp(r),
+                      )
+                    )
                 }): _*
               )
             }):_*

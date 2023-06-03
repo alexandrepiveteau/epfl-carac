@@ -19,9 +19,6 @@ object CollectionsCasts {
  */
 case class CollectionsEDB(wrapped: mutable.ArrayBuffer[CollectionsRow]) extends EDB with IterableOnce[CollectionsRow] {
   export wrapped.{ length, clear, nonEmpty, toSet, apply, mkString, iterator }
-
-  def ++(other: CollectionsEDB): CollectionsEDB =
-    CollectionsEDB(wrapped ++ other.wrapped)
   
   def addOne(elem: CollectionsRow): this.type =
     wrapped.addOne(elem)

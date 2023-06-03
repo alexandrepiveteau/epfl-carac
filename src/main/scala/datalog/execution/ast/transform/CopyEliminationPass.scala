@@ -63,10 +63,8 @@ class CopyEliminationPass()(using ASTTransformerContext) extends Transformer {
 
           RuleNode(transform(head), body.map(transform), transformedAtoms, hash)
         case n: AtomNode => n match {
-          case NegAtom(expr) =>
-            NegAtom(transform(expr))
-          case LogicAtom(relation, terms) =>
-            LogicAtom(ctx.aliases.getOrElse(relation, relation), terms)
+          case LogicAtom(relation, terms, neg) =>
+            LogicAtom(ctx.aliases.getOrElse(relation, relation), terms, neg)
         }
         case n: TermNode => n
       }

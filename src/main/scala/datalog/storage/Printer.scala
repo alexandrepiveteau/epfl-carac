@@ -97,8 +97,9 @@ class Printer[S <: StorageManager](val sm: S) {
         s"\n\t${printAST(head)} :- ${body.map(printAST).mkString("(", ", ", ")")}" +
           s" => idx=${sm.allRulesAllIndexes(atoms.head.rId)(hash).toStringWithNS(sm.ns)}\n"
       case n: AtomNode => n match {
-        case NegAtom(expr) => s"!${printAST(expr)}"
-        case LogicAtom(relation, terms) => s"${sm.ns(relation)}${terms.map(printAST).mkString("(", ", ", ")")}"
+        case LogicAtom(relation, terms, neg) =>
+          val prefix = if neg then "!" else ""
+          s"$prefix${sm.ns(relation)}${terms.map(printAST).mkString("(", ", ",")")}"
       }
       case n: TermNode => n match {
         case VarTerm(value) => s"${value.toString}"
