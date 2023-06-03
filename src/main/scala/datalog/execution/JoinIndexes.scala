@@ -19,6 +19,7 @@ type AllIndexes = mutable.Map[String, JoinIndexes]
  * @param projIndexes - for each term in the head, either ("c", the constant value) or ("v", the first index of the variable within the body)
  * @param deps - set of relations directly depended upon by this rule
  * @param negated - for each atom in the body, whether it is negated
+ * @param sizes - for each atom in the body, the number of terms it has
  * @param edb - for rules that have EDBs defined on the same predicate, just read
  */
 case class JoinIndexes(varIndexes: Seq[Seq[Int]],
