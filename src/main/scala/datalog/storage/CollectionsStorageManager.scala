@@ -93,7 +93,6 @@ abstract class CollectionsStorageManager(override val ns: NS) extends StorageMan
     )
     // 3. Return a combination from all the constants.
     val list = constants.toList
-    println(s"getting for rule with arity $arity. Found constants $list.")
     val length = arity
     val buffer = mutable.ArrayBuffer.empty[CollectionsRow]
 
@@ -101,7 +100,6 @@ abstract class CollectionsStorageManager(override val ns: NS) extends StorageMan
     def combinations(): Unit =
       def loop(i: Int, acc: List[Constant]): Unit =
         if i == length then
-          println(s"adding $acc")
           buffer.addOne(CollectionsRow(acc))
         else list.foreach(c => loop(i + 1, c :: acc))
       loop(0, Nil)
