@@ -76,8 +76,6 @@ object JoinIndexes {
         matches.map(_._2).toIndexedSeq
       )
       .toIndexedSeq
-    
-    // TODO (ALEX): Check that all the variables are limited here.
 
     // variable ids in the head atom
     val projects = rule(0).terms.map {
@@ -87,6 +85,28 @@ object JoinIndexes {
         ("v", variables(v))
       case c: Constant => ("c", c)
     }
+
+    // The head atom may not be negated.
+    if (rule(0).negated) throw new Exception("Head atom cannot be negated")
+
+    // All variables in the head atom must be limited.
+    val variablesInPositiveAtoms =
+      rule.drop(1)
+        .filter(!_.negated)
+        .flatMap(_.terms)
+        .flatMap {
+          case v: Variable => Some(v)
+          case _ => None
+        }
+    val variablesLimited = rule.flatMap(_.terms)
+      .flatMap {
+        case v: Variable => Some(v)
+        case _ => None
+      }
+      .forall(v => variablesInPositiveAtoms.contains(v))
+
+    if !variablesLimited then throw new Exception("Some variables in the head atom are not limited")
+
     new JoinIndexes(bodyVars, constants.toMap, projects, deps, negated, sizes, rule)
   }
 

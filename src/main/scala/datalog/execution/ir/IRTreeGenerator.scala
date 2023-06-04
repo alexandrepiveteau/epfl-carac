@@ -141,6 +141,8 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
     ast match {
       case ProgramNode(ruleMap) =>
         val scc = ctx.precedenceGraph.scc(ctx.toSolve)
+        if ctx.precedenceGraph.hasNegativeCycle(ctx.storageManager.allRulesAllIndexes) then
+          throw new Exception("Negative cycle detected")
         val stratum = scc.map(rels => ruleMap.view.filterKeys(rels.contains))
         ProgramOp(
           SequenceOp(OpCode.EVAL_STRATA,
@@ -166,6 +168,8 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
     ast match {
       case ProgramNode(ruleMap) =>
         val scc = ctx.precedenceGraph.scc(ctx.toSolve)
+        if ctx.precedenceGraph.hasNegativeCycle(ctx.storageManager.allRulesAllIndexes) then
+          throw new Exception("Negative cycle detected")
         val stratum = scc.map(rels => ruleMap.view.filterKeys(rels.contains))
         ProgramOp(
           SequenceOp(OpCode.EVAL_STRATA,

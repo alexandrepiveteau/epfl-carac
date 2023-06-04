@@ -87,6 +87,8 @@ class NaiveExecutionEngine(val storageManager: StorageManager) extends Execution
       throw new Exception("Solving for rule without body")
     }
     val strata = precedenceGraph.scc(toSolve)
+    if precedenceGraph.hasNegativeCycle(storageManager.allRulesAllIndexes) then
+      throw new Exception("Negative cycle detected")
     storageManager.initEvaluation() // facts discovered in the previous iteration
 
     debug(s"solving relation: ${storageManager.ns(toSolve)} order of relations=", strata.toString)
