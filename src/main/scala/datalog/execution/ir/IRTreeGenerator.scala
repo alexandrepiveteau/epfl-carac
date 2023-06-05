@@ -54,10 +54,16 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
    * @param edb     the [[IROp[EDB]]] to be negated.
    * @return the [[IROp[EDB]]] after applying negation.
    */
-  private def withNegation(negated: Boolean)
+  private def withNegation(negated: Boolean, relation: RelationId)
                           (arity: Int, edb: IROp[EDB]): IROp[EDB] =
     if !negated then edb
-    else NegateOp(arity, edb)
+    else NegateOp(arity,
+          UnionOp(OpCode.UNION,
+            edb,
+            ScanDiscoveredOp(relation),
+          ),
+      )
+
 
   def naiveEvalRule(ast: ASTNode): IROp[EDB] = {
     ast match {
@@ -75,11 +81,8 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
         else
           ProjectJoinFilterOp(atoms.head.rId, hash,
             k.deps.zipWithIndex.map((r, i) =>
-              withNegation(k.negated(i))(k.sizes(i),
-                UnionOp(OpCode.UNION,
-                  ScanOp(r, DB.Derived, KNOWLEDGE.Known),
-                  ScanDiscoveredOp(r),
-                )
+              withNegation(k.negated(i), r)(k.sizes(i),
+                ScanOp(r, DB.Derived, KNOWLEDGE.Known),
               )
             ):_*
           )
@@ -114,18 +117,12 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
                   if (r == d && !found && i > idx)
                     found = true
                     idx = i
-                    withNegation(k.negated(i))(k.sizes(i),
-                      UnionOp(OpCode.UNION,
+                    withNegation(k.negated(i), r)(k.sizes(i),
                         ScanOp(r, DB.Delta, KNOWLEDGE.Known),
-                        ScanDiscoveredOp(r),
-                      )
                     )
                   else
-                    withNegation(k.negated(i))(k.sizes(i),
-                      UnionOp(OpCode.UNION,
-                        ScanOp(r, DB.Derived, KNOWLEDGE.Known),
-                        ScanDiscoveredOp(r),
-                      )
+                    withNegation(k.negated(i), r)(k.sizes(i),
+                      ScanOp(r, DB.Derived, KNOWLEDGE.Known),
                     )
                 }): _*
               )
