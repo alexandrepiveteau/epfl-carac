@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit
 import scala.collection.{immutable, mutable}
 import scala.jdk.StreamConverters.*
 
+@Fork(1)
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
 class loops() extends loops_test {

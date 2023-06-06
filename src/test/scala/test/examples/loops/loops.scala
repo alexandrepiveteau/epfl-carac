@@ -20,7 +20,7 @@ trait loops {
     val x, y = program.variable()
 
     val min = "0"
-    val max = "399"
+    val max = "99"
 
     start(min) :- ()
 
