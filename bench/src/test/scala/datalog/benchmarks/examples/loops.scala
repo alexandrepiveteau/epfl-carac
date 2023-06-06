@@ -1,236 +1,104 @@
 package datalog.benchmarks.examples
 
-import datalog.benchmarks.ExampleBenchmarkGenerator
-import datalog.dsl.{Constant, Program}
-
-import java.nio.file.Paths
-import java.util.concurrent.TimeUnit
+import datalog.dsl.{Constant, Program, Term}
+import datalog.execution.{NaiveExecutionEngine, StagedExecutionEngine}
+import datalog.storage.{DefaultStorageManager, VolcanoStorageManager}
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import test.examples.loops.{loops => loops_test}
+import test.examples.loops.loops as loops_test
 
-@Fork(examples_fork) // # of jvms that it will use
-@Warmup(iterations = examples_warmup_iterations, time = examples_warmup_time, timeUnit = TimeUnit.SECONDS, batchSize = examples_xl_batchsize)
-@Measurement(iterations = examples_iterations, time = examples_time, timeUnit = TimeUnit.SECONDS, batchSize = examples_xl_batchsize)
+import java.nio.file.{Files, Path, Paths}
+import java.util.concurrent.TimeUnit
+import scala.collection.{immutable, mutable}
+import scala.jdk.StreamConverters.*
+
 @State(Scope.Thread)
 @BenchmarkMode(Array(Mode.AverageTime))
-class loops() extends ExampleBenchmarkGenerator("loops") with loops_test {
+class loops() extends loops_test {
+
+  private val facts = mutable.Map[String, Set[Seq[Term]]]()
+  private val expectedFacts = mutable.Map[String, Set[Seq[Term]]]()
 
   @Setup
-  def s(): Unit = setup() // can't add annotations to super, so just call
-
-  @TearDown(Level.Invocation)
-  def f(): Unit = finish()
-
-  // volcano, naive
-  @Benchmark def naive_volcano__(blackhole: Blackhole): Unit = {
-    // this is rancid but otherwise have to copy the method name twice, which is typo prone. Put extra stuff for runnign with a regex after __
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if(!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-  @Benchmark def seminaive_volcano__ci(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if(!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def naive_default__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if(!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-  @Benchmark def seminaive_default__ci(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  // interpreted
-  @Benchmark def interpreted_default_unordered__ci(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-  // compiled
-  @Benchmark def compiled_default_unordered__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-  // jit
-  @Benchmark def jit_default_unordered_blocking_EVALRULEBODY__ci(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
+  def setup(): Unit = {
+    val factdir = Paths.get("..", "src", "test", "scala", "test", "examples", "loops", "facts")
+    if (Files.exists(factdir))
+      Files.walk(factdir, 1)
+        .filter(p => Files.isRegularFile(p))
+        .forEach(f => {
+          val edbName = f.getFileName.toString.replaceFirst("[.][^.]+$", "")
+          val reader = Files.newBufferedReader(f)
+          val headers = reader.readLine().split("\t")
+          val edbs = reader.lines()
+            .map(l => {
+              val factInput = l
+                .split("\t")
+                .zipWithIndex.map((s, i) =>
+                (headers(i) match {
+                  case "Int" => s.toInt
+                  case "String" => s
+                  case _ => throw new Exception(s"Unknown type ${headers(i)}")
+                }).asInstanceOf[Term]
+              ).toSeq
+              if (factInput.size != headers.size)
+                throw new Exception(s"Input data for fact of length ${factInput.size} but should be ${headers.mkString("[", ", ", "]")}. Line='$l'")
+              factInput
+            }).toScala(Set)
+          reader.close()
+          facts(edbName) = edbs
+        })
+    // Generate expected
+    val expDir = Paths.get("..", "src", "test", "scala", "test", "examples", "loops", "expected")
+    if (!Files.exists(expDir)) throw new Exception(s"Missing expected directory '$expDir'")
+    Files.walk(expDir, 1)
+      .filter(p => Files.isRegularFile(p) && p.toString.endsWith(".csv"))
+      .forEach(f => {
+        val rule = f.getFileName.toString.replaceFirst("[.][^.]+$", "")
+        val reader = Files.newBufferedReader(f)
+        val headers = reader.readLine().split("\t")
+        val expected = reader.lines()
+          .map(l => l.split("\t").zipWithIndex.map((s, i) =>
+            (headers(i) match {
+              case "Int" => s.toInt
+              case "String" => s
+              case _ => throw new Exception(s"Unknown type ${headers(i)}")
+            }).asInstanceOf[Term]
+          ).toSeq)
+          .toScala(Set)
+        expectedFacts(rule) = expected
+        reader.close()
+      })
   }
 
-  @Benchmark def jit_default_unordered_async_EVALRULEBODY__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
+  def run(program: Program): Unit = {
+    for ((name, facts) <- facts) {
+      val r = program.relation[Constant](name)
+      for (fact <- facts) {
+        r(fact: _*) :- ()
+      }
+    }
+
+    pretest(program)
+
+    for ((name, facts) <- expectedFacts) {
+      val r = program.namedRelation[Constant](name)
+      val tuples = program.solve(r.id)
+      val expected = facts
+      if (tuples != expected) {
+        throw new Exception(s"Expected $expected but got $tuples")
+      }
+    }
   }
 
-  // jit
-  @Benchmark def jit_default_unordered_async_EVALRULEBODY_aot__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
+  // @Benchmark
+  def naive_volcano(x: Blackhole): Unit = {
+    val program = Program(NaiveExecutionEngine(VolcanoStorageManager()))
+    x.consume(run(program))
   }
 
-  @Benchmark def interpreted_default_best123__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_worst123__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_best12__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_worst12__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_best23__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_worst23__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_best13__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_worst13__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_best1__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_worst1__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_best2__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_worst2__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_best3__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def interpreted_default_worst3__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def jit_default_best123_blocking_EVALRULEBODY__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def jit_default_best123_async_EVALRULEBODY__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def jit_EVALRULEBODY_aot_async_best123__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def jit_SPJ_blocking_best123__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def jit_SPJ_async_best123__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def jit_EVALRULESN_blocking_best123__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
-  }
-
-  @Benchmark def jit_EVALRULESN_async_best123__(blackhole: Blackhole): Unit = {
-    val p = s"${Thread.currentThread.getStackTrace()(2).getMethodName.split("__").head}"
-    if (!programs.contains(p))
-      throw new Exception(f"Error: program for '$p' not found")
-    blackhole.consume(run(programs(p), result))
+  @Benchmark
+  def staged(x: Blackhole): Unit = {
+    val program = Program(StagedExecutionEngine(DefaultStorageManager()))
+    x.consume(run(program))
   }
 }
