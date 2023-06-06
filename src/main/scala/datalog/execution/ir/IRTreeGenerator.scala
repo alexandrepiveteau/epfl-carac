@@ -45,6 +45,26 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
         ):_*,
     )
 
+  /**
+   * Returns the [[IROp[EDB]]] after applying negation, if the rule is
+   * actually negated.
+   *
+   * @param negated true iff the complement of the rule should be taken.
+   * @param arity   the arity of the relation.
+   * @param edb     the [[IROp[EDB]]] to be negated.
+   * @return the [[IROp[EDB]]] after applying negation.
+   */
+  private def withNegation(negated: Boolean, relation: RelationId)
+                          (arity: Int, edb: IROp[EDB]): IROp[EDB] =
+    if !negated then edb
+    else NegateOp(arity,
+          UnionOp(OpCode.UNION,
+            edb,
+            ScanDiscoveredOp(relation),
+          ),
+      )
+
+
   def naiveEvalRule(ast: ASTNode): IROp[EDB] = {
     ast match {
       case AllRulesNode(rules, rId, edb) =>
@@ -60,7 +80,11 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
           ScanEDBOp(r)
         else
           ProjectJoinFilterOp(atoms.head.rId, hash,
-            k.deps.map(r => ScanOp(r, DB.Derived, KNOWLEDGE.Known)):_*
+            k.deps.zipWithIndex.map((r, i) =>
+              withNegation(k.negated(i), r)(k.sizes(i),
+                ScanOp(r, DB.Derived, KNOWLEDGE.Known),
+              )
+            ):_*
           )
       case _ =>
         debug("AST node passed to naiveEval:", () => ctx.storageManager.printer.printAST(ast))
@@ -93,9 +117,13 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
                   if (r == d && !found && i > idx)
                     found = true
                     idx = i
-                    ScanOp(r, DB.Delta, KNOWLEDGE.Known)
+                    withNegation(k.negated(i), r)(k.sizes(i),
+                        ScanOp(r, DB.Delta, KNOWLEDGE.Known),
+                    )
                   else
-                    ScanOp(r, DB.Derived, KNOWLEDGE.Known)
+                    withNegation(k.negated(i), r)(k.sizes(i),
+                      ScanOp(r, DB.Derived, KNOWLEDGE.Known),
+                    )
                 }): _*
               )
             }):_*
@@ -110,6 +138,8 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
     ast match {
       case ProgramNode(ruleMap) =>
         val scc = ctx.precedenceGraph.scc(ctx.toSolve)
+        if ctx.precedenceGraph.hasNegativeCycle(ctx.storageManager.allRulesAllIndexes) then
+          throw new Exception("Negative cycle detected")
         val stratum = scc.map(rels => ruleMap.view.filterKeys(rels.contains))
         ProgramOp(
           SequenceOp(OpCode.EVAL_STRATA,
@@ -135,6 +165,8 @@ class IRTreeGenerator(using val ctx: InterpreterContext)(using JITOptions) {
     ast match {
       case ProgramNode(ruleMap) =>
         val scc = ctx.precedenceGraph.scc(ctx.toSolve)
+        if ctx.precedenceGraph.hasNegativeCycle(ctx.storageManager.allRulesAllIndexes) then
+          throw new Exception("Negative cycle detected")
         val stratum = scc.map(rels => ruleMap.view.filterKeys(rels.contains))
         ProgramOp(
           SequenceOp(OpCode.EVAL_STRATA,

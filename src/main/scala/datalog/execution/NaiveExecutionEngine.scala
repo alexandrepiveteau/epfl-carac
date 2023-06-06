@@ -42,8 +42,20 @@ class NaiveExecutionEngine(val storageManager: StorageManager) extends Execution
   }
 
   def insertEDB(rule: Atom): Unit = {
-    if (!storageManager.edbContains(rule.rId))
-      prebuiltOpKeys.getOrElseUpdate(rule.rId, mutable.ArrayBuffer[JoinIndexes]()).addOne(JoinIndexes(IndexedSeq(), Map(), IndexedSeq(), Seq(rule.rId), Array(rule), true))
+    if (!storageManager.edbContains(rule.rId)) {
+      val index = JoinIndexes(
+        varIndexes = IndexedSeq(),
+        constIndexes = Map(),
+        projIndexes = IndexedSeq(),
+        deps = Seq(rule.rId),
+        negated = Array(false),
+        sizes = Array(rule.terms.size),
+        atoms = Array(rule),
+        edb = true,
+      )
+      prebuiltOpKeys.getOrElseUpdate(rule.rId, mutable.ArrayBuffer[JoinIndexes]())
+        .addOne(index)
+    }
     storageManager.insertEDB(rule)
   }
 
@@ -75,6 +87,8 @@ class NaiveExecutionEngine(val storageManager: StorageManager) extends Execution
       throw new Exception("Solving for rule without body")
     }
     val strata = precedenceGraph.scc(toSolve)
+    if precedenceGraph.hasNegativeCycle(storageManager.allRulesAllIndexes) then
+      throw new Exception("Negative cycle detected")
     storageManager.initEvaluation() // facts discovered in the previous iteration
 
     debug(s"solving relation: ${storageManager.ns(toSolve)} order of relations=", strata.toString)
