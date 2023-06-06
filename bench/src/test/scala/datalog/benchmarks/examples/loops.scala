@@ -1,6 +1,5 @@
 package datalog.benchmarks.examples
 
-import datalog.benchmarks.ExampleBenchmarkGenerator
 import datalog.dsl.{Constant, Program, Term}
 import datalog.execution.{NaiveExecutionEngine, StagedExecutionEngine}
 import datalog.storage.{DefaultStorageManager, VolcanoStorageManager}
