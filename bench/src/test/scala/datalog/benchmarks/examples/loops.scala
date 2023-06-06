@@ -1,7 +1,7 @@
 package datalog.benchmarks.examples
 
 import datalog.dsl.{Constant, Program, Term}
-import datalog.execution.{NaiveExecutionEngine, StagedExecutionEngine}
+import datalog.execution.{NaiveExecutionEngine, SemiNaiveExecutionEngine, StagedExecutionEngine}
 import datalog.storage.{DefaultStorageManager, VolcanoStorageManager}
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
@@ -90,15 +90,39 @@ class loops() extends loops_test {
     }
   }
 
-  // @Benchmark
+  @Benchmark
+  def naive_default(x: Blackhole): Unit = {
+    val program = Program(NaiveExecutionEngine(DefaultStorageManager()))
+    x.consume(run(program))
+  }
+
+  @Benchmark
   def naive_volcano(x: Blackhole): Unit = {
     val program = Program(NaiveExecutionEngine(VolcanoStorageManager()))
     x.consume(run(program))
   }
 
   @Benchmark
-  def staged(x: Blackhole): Unit = {
+  def semiNaive_default(x: Blackhole): Unit = {
+    val program = Program(SemiNaiveExecutionEngine(DefaultStorageManager()))
+    x.consume(run(program))
+  }
+
+  @Benchmark
+  def semiNaive_volcano(x: Blackhole): Unit = {
+    val program = Program(SemiNaiveExecutionEngine(VolcanoStorageManager()))
+    x.consume(run(program))
+  }
+
+  @Benchmark
+  def staged_default(x: Blackhole): Unit = {
     val program = Program(StagedExecutionEngine(DefaultStorageManager()))
+    x.consume(run(program))
+  }
+
+  @Benchmark
+  def staged_volcano(x: Blackhole): Unit = {
+    val program = Program(StagedExecutionEngine(VolcanoStorageManager()))
     x.consume(run(program))
   }
 }
