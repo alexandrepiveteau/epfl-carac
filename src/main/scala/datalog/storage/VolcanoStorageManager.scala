@@ -23,18 +23,24 @@ class VolcanoStorageManager(ns: NS = NS()) extends CollectionsStorageManager(ns)
    * actually negated.
    *
    * @param negated true iff the complement of the rule should be taken.
+   * @param relation the [[datalog.dsl.RelationId]] of the relation.
    * @param arity the arity of the relation.
    * @param rId the [[datalog.dsl.RelationId]] of the relation.
    * @param edb the [[relOps.VolOperator]] representing the EDB.
    * @return the [[relOps.VolOperator]] after applying negation.
    */
-  private def withNegation(negated: Boolean)
+  private def withNegation(negated: Boolean, relation: RelationId)
                           (rId: RelationId, arity: Int, edb: relOps.VolOperator): relOps.VolOperator =
     import relOps.*
     if !negated then edb
     else
       val complement = Scan(getAllPossibleEDBs(arity), rId)
-      Diff(mutable.ArrayBuffer(complement, edb))
+      Diff(mutable.ArrayBuffer(complement,
+        Union(Seq(
+          Scan(getDiscoveredEDBs(rId), arity),
+          edb,
+        )),
+      ))
 
   /**
    * Use relational operators to evaluate an IDB rule using Naive algo
@@ -55,11 +61,9 @@ class VolcanoStorageManager(ns: NS = NS()) extends CollectionsStorageManager(ns)
             Project(
               Join(k.deps.zipWithIndex.map((r, i) =>
                 // TODO: warn if EDB is empty? Right now can't tell the difference between undeclared and empty EDB
-                val scan = Union(Seq(
-                  Scan(getKnownDerivedDB(r), r),
-                  Scan(getDiscoveredEDBs(r), r),
-                ))
-                withNegation(k.negated(i))(r, k.sizes(i), scan)
+                withNegation(k.negated(i), r)(r, k.sizes(i),
+                  Scan(getKnownDerivedDB(r), r)
+                )
               ), k.varIndexes, k.constIndexes),
               k.projIndexes
             )
@@ -93,18 +97,12 @@ class VolcanoStorageManager(ns: NS = NS()) extends CollectionsStorageManager(ns)
                     if (r == d && !found && i > idx)
                       found = true
                       idx = i
-                      withNegation(k.negated(i))(r, k.sizes(i),
-                        Union(Seq(
-                          Scan(getKnownDeltaDB(r), r),
-                          Scan(getDiscoveredEDBs(r), r),
-                        ))
+                      withNegation(k.negated(i), r)(r, k.sizes(i),
+                        Scan(getKnownDeltaDB(r), r),
                       )
                     else
-                      withNegation(k.negated(i))(r, k.sizes(i),
-                        Union(Seq(
-                          Scan(getKnownDerivedDB(r), r),
-                          Scan(getDiscoveredEDBs(r), r),
-                        ))
+                      withNegation(k.negated(i), r)(r, k.sizes(i),
+                        Scan(getKnownDerivedDB(r), r),
                       )
                   }),
                   k.varIndexes,

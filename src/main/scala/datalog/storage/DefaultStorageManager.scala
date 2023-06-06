@@ -213,14 +213,17 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
    * actually negated.
    *
    * @param negated true iff the complement of the rule should be taken.
+   * @param relation the [[RelationId]] of the relation.
    * @param arity the arity of the relation.
    * @param edb the [[CollectionsEDB]] to be negated.
    * @return the [[CollectionsEDB]] after applying negation.
    */
-  private def withNegation(negated: Boolean)
+  private def withNegation(negated: Boolean, relation: RelationId)
                           (arity: Int, edb: EDB): EDB =
     if !negated then edb
-    else diff(getAllPossibleEDBs(arity), edb)
+    else diff(getAllPossibleEDBs(arity),
+      union(Seq(getDiscoveredEDBs(relation), edb))
+    )
 
   /**
    * Use iterative collection operators to evaluate an IDB rule using Semi-Naive algo
@@ -243,13 +246,13 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
                 if (r == d && !found && i > idx) {
                   found = true
                   idx = i
-                  withNegation(k.negated(i))(k.sizes(i),
-                    union(Seq(getKnownDeltaDB(r), getDiscoveredEDBs(r)))
+                  withNegation(k.negated(i), r)(k.sizes(i),
+                    getKnownDeltaDB(r)
                   )
                 }
                 else {
-                  withNegation(k.negated(i))(k.sizes(i),
-                    union(Seq(getKnownDerivedDB(r), getDiscoveredEDBs(r)))
+                  withNegation(k.negated(i), r)(k.sizes(i),
+                    getKnownDerivedDB(r)
                   ) // TODO: warn if EDB is empty? Right now can't tell the difference between undeclared and empty EDB
                 }
               ), k, (0, 0, 0)).wrapped // don't sort when not staging
@@ -267,8 +270,8 @@ class DefaultStorageManager(ns: NS = new NS()) extends CollectionsStorageManager
           projectHelper(
             joinHelper(
               k.deps.zipWithIndex.map((r, i) =>
-                withNegation(k.negated(i))(k.sizes(i),
-                  union(Seq(getKnownDerivedDB(r), getDiscoveredEDBs(r)))
+                withNegation(k.negated(i), r)(k.sizes(i),
+                  getKnownDerivedDB(r)
                 )
               ), k // TODO: warn if EDB is empty? Right now can't tell the difference between undeclared and empty EDB)
             ), k
